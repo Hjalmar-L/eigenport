@@ -6,46 +6,46 @@ import pandas as pd
 import yfinance as yf
 
 DEFAULT_TICKERS = [
-    "AAPL",
-    "MSFT",
-    "AMZN",
-    "NVDA",
-    "GOOGL",
-    "GOOG",
-    "META",
-    "TSLA",
-    "BRK-B",
-    "JPM",
-    "UNH",
-    "XOM",
-    "V",
-    "LLY",
-    "AVGO",
-    "MA",
-    "JNJ",
-    "PG",
-    "HD",
-    "COST",
-    "MRK",
-    "ABBV",
-    "ADBE",
-    "CRM",
-    "PEP",
-    "NFLX",
-    "KO",
-    "AMD",
-    "BAC",
-    "CVX",
-    "WMT",
-    "TMO",
-    "MCD",
-    "CSCO",
-    "ACN",
-    "DIS",
-    "DHR",
-    "VZ",
-    "ABT",
-    "PFE",
+    "AAPL",  # Apple
+    "MSFT",  # Microsoft
+    "AMZN",  # Amazon
+    "NVDA",  # Nvidia
+    "GOOGL",  # Alphabet Class A (Google)
+    "GOOG",  # Alphabet Class C (Google)
+    "META",  # Meta Platforms
+    "TSLA",  # Tesla
+    "BRK-B",  # Berkshire Hathaway Class B
+    "JPM",  # JPMorgan Chase
+    "UNH",  # UnitedHealth Group
+    "XOM",  # Exxon Mobil
+    "V",  # Visa
+    "LLY",  # Eli Lilly
+    "AVGO",  # Broadcom
+    "MA",  # Mastercard
+    "JNJ",  # Johnson & Johnson
+    "PG",  # Procter & Gamble
+    "HD",  # Home Depot
+    "COST",  # Costco
+    "MRK",  # Merck
+    "ABBV",  # AbbVie
+    "ADBE",  # Adobe
+    "CRM",  # Salesforce
+    "PEP",  # PepsiCo
+    "NFLX",  # Netflix
+    "KO",  # Coca-Cola
+    "AMD",  # Advanced Micro Devices
+    "BAC",  # Bank of America
+    "CVX",  # Chevron
+    "WMT",  # Walmart
+    "TMO",  # Thermo Fisher Scientific
+    "MCD",  # McDonald's
+    "CSCO",  # Cisco Systems
+    "ACN",  # Accenture
+    "DIS",  # Walt Disney
+    "DHR",  # Danaher
+    "VZ",  # Verizon
+    "ABT",  # Abbott Laboratories
+    "PFE",  # Pfizer
 ]
 
 
