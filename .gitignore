@@ -1,0 +1,5 @@
+*.txt
+*.toml
+*.csv
+__pycache__/
+PKG-INFO/

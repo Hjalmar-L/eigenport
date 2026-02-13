@@ -1,0 +1,176 @@
+Metadata-Version: 2.4
+Name: eigen-orthogonal-portfolio
+Version: 0.1.0
+Summary: Eigen-portfolio long-only backtest with orthogonal component diagnostics
+Author: Codex
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.24
+Requires-Dist: pandas>=2.0
+Requires-Dist: scipy>=1.10
+Requires-Dist: matplotlib>=3.7
+Requires-Dist: yfinance>=0.2.40
+Provides-Extra: ml
+Requires-Dist: scikit-learn>=1.3; extra == "ml"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+
+# Eigen Orthogonal Portfolio
+
+This project demonstrates eigen-portfolios and builds a **long-only** equity portfolio where **component return series** are as orthogonal (uncorrelated) as possible under practical constraints.
+
+It implements a strict rolling no-lookahead backtest using US large-cap equities from `yfinance` adjusted close prices.
+
+## Core idea
+
+Given a rolling covariance estimate \(C_t\):
+
+1. Compute eigendecomposition \(C_t = V_t \Lambda_t V_t^\top\).
+2. Build unconstrained eigen-portfolios (`raw`) for diagnostics; their in-sample component returns are near-diagonal in covariance/correlation.
+3. Build long-only approximate component portfolios by solving, for each component \(k\):
+
+\[
+\min_{w \ge 0,\; \mathbf{1}^\top w = 1}
+\|w - v_k\|_2^2 + \gamma w^\top C_t w
+\]
+
+4. Blend long-only components into final long-only asset weights:
+
+\[
+w_t = \widetilde{W}_t a_t, \quad a_t \ge 0,\; \mathbf{1}^\top a_t = 1
+\]
+
+where `a_t` is either:
+- `ECB` (default): component risk-parity style blend (equalize approximate component variance contributions), or
+- `ECB-EqualA`: equal component blend.
+
+## What “orthogonal returns” means here
+
+Orthogonality is measured on **component return series** \(g_t = \widetilde{W}^\top r_t\), not asset pairwise correlations.
+
+For ECB strategies we track:
+
+1. In-sample diagonality: mean absolute off-diagonal of `corr(G_window)`.
+2. Out-of-sample diagonality: mean absolute off-diagonal of `corr(g_hold)` each hold period.
+3. Stability: eigenvector sign alignment and turnover.
+
+## Rebalance / no-lookahead policy
+
+- Covariance window: `252` trading days by default.
+- Rebalance: **first trading day of each month**.
+- Strict no-lookahead at rebalance date `t`:
+  - estimation uses returns `t-window ... t-1` only,
+  - new weights apply from day `t` onward.
+
+## Implemented strategies
+
+- `ew`: equal weight across assets.
+- `mv_lo`: long-only minimum variance.
+- `ecb`: Eigen-Component Balanced with component risk-parity blend.
+- `ecb_equala`: ECB with equal blend weights.
+
+## Covariance estimators
+
+- `sample`
+- `ledoitwolf` (uses `sklearn` if installed; otherwise falls back)
+- `shrink` with
+  \(C_{shrunk} = (1-\delta)C + \delta\mu I\), \(\mu = \mathrm{tr}(C)/N\)
+
+All covariance outputs are symmetrized and forced PSD by eigenvalue clipping.
+
+## Project layout
+
+```
+eigen_orthogonal_portfolio/
+  pyproject.toml
+  README.md
+  src/eop/
+    __init__.py
+    data.py
+    preprocess.py
+    cov.py
+    eigen.py
+    components.py
+    optimizer.py
+    strategies.py
+    backtest.py
+    metrics.py
+    plots.py
+    cli.py
+  tests/
+    test_cov.py
+    test_eigen.py
+    test_components.py
+    test_backtest.py
+  outputs/
+```
+
+## Installation
+
+From `eigen_orthogonal_portfolio/`:
+
+```bash
+pip install -e .
+pip install pytest
+```
+
+Optional for Ledoit-Wolf estimator:
+
+```bash
+pip install scikit-learn
+```
+
+## Run
+
+```bash
+python -m eop.cli \
+  --tickers "AAPL,MSFT,AMZN,NVDA,GOOGL,META,TSLA,BRK-B,JPM,UNH,XOM,V,LLY,AVGO,MA,JNJ,PG,HD,COST,MRK,ABBV,ADBE,CRM,PEP,NFLX,KO,AMD,BAC,CVX,WMT" \
+  --start 2015-01-01 \
+  --end 2025-12-31 \
+  --window 252 \
+  --rebalance monthly \
+  --k 5 \
+  --strategy ecb \
+  --cov sample \
+  --tcost_bps 5 \
+  --winsorize none
+```
+
+Notes:
+- `--strategy` selects the focus strategy, but the CLI backtests all four strategies for side-by-side comparison outputs.
+- `--winsorize p01_p99` clips each asset return series at 1st/99th percentiles.
+
+## Outputs
+
+Written to `outputs/`:
+
+- `summary.csv`
+- `returns_<strategy>.csv`
+- `weights_<strategy>.csv`
+- `turnover_<strategy>.csv`
+- `component_returns_<strategy>.csv` (ECB variants)
+- `oos_diagonality_<strategy>.csv` (ECB variants)
+- `component_weight_drift_<strategy>.csv` (ECB variants)
+- `equity_curves.png`
+- `rolling_vol_sharpe.png`
+- `diagonality_<focus_strategy>.png` (ECB focus)
+- `component_corr_heatmap_<focus_strategy>.png` (ECB focus)
+
+## Tests
+
+```bash
+pytest
+```
+
+The test suite checks:
+- covariance symmetry + PSD enforcement,
+- eigen sorting/reconstruction,
+- no-lookahead windowing,
+- long-only and fully invested constraints,
+- component off-diagonal correlation metric behavior.
+
+## Practical interpretation
+
+- Exact eigen-portfolio orthogonality is straightforward in unconstrained long-short space.
+- Under long-only constraints, exact orthogonality is generally impossible.
+- This implementation measures how close component return correlations stay to diagonal in-sample and out-of-sample, while keeping final asset weights long-only and fully invested.
