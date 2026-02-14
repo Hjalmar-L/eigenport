@@ -12,6 +12,12 @@ def _synthetic_returns(n_days: int = 520, n_assets: int = 6) -> pd.DataFrame:
     return pd.DataFrame(data, index=idx, columns=cols)
 
 
+def _synthetic_prices_from_returns(returns: pd.DataFrame) -> pd.DataFrame:
+    prices = 100.0 * np.exp(returns.cumsum())
+    prices.columns = returns.columns
+    return prices
+
+
 def test_no_lookahead_estimation_window_end_before_rebalance():
     returns = _synthetic_returns()
     result = run_backtest(
@@ -27,8 +33,20 @@ def test_no_lookahead_estimation_window_end_before_rebalance():
 
 def test_long_only_strategies_respect_constraints():
     returns = _synthetic_returns()
+    prices = _synthetic_prices_from_returns(returns)
+    meta = pd.DataFrame(
+        {
+            "float_shares": np.linspace(1e8, 2e8, returns.shape[1]),
+            "shares_outstanding": np.linspace(1.2e8, 2.2e8, returns.shape[1]),
+            "market_cap": np.linspace(1e10, 2e10, returns.shape[1]),
+        },
+        index=returns.columns,
+    )
 
-    for strategy in ["ew", "mv_lo", "ecb", "ecb_equala"]:
+    for strategy in ["ew", "mv_lo", "ecb", "ecb_equala", "market_cap"]:
+        kwargs = {}
+        if strategy == "market_cap":
+            kwargs = {"prices": prices, "market_cap_meta": meta}
         result = run_backtest(
             returns=returns,
             strategy=strategy,
@@ -37,6 +55,7 @@ def test_long_only_strategies_respect_constraints():
             k=3,
             cov_estimator="sample",
             tcost_bps=5,
+            **kwargs,
         )
 
         w = result.weights

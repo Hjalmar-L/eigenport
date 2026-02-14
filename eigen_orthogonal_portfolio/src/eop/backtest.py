@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -55,8 +56,28 @@ def _one_way_turnover(w_new: np.ndarray, w_old: np.ndarray) -> float:
     return 0.5 * float(np.sum(np.abs(w_new - w_old)))
 
 
+def _compute_market_cap_weights(
+    assets: list[str],
+    market_cap_meta: pd.DataFrame | None,
+) -> np.ndarray:
+    if market_cap_meta is None or market_cap_meta.empty:
+        warnings.warn("market_cap_meta is missing; falling back to equal weights for market_cap strategy")
+        return np.ones(len(assets)) / len(assets)
+
+    meta = market_cap_meta.reindex(assets)
+    market_cap = meta["market_cap"].values.astype(float)
+    cap = np.where(np.isfinite(market_cap) & (market_cap > 0), market_cap, 0.0)
+    total = float(cap.sum())
+    if total <= 0:
+        warnings.warn("No valid market caps found; falling back to equal weights for market_cap strategy")
+        return np.ones(len(assets)) / len(assets)
+    return cap / total
+
+
 def run_backtest(
     returns: pd.DataFrame,
+    prices: pd.DataFrame | None = None,
+    market_cap_meta: pd.DataFrame | None = None,
     strategy: str = "ecb",
     window: int = 252,
     rebalance: str = "monthly",
@@ -104,11 +125,24 @@ def run_backtest(
         estimation_end = returns.index[r_idx - 1]
         estimation_end_map[rebalance_date] = estimation_end
 
-        cov = estimate_covariance(
-            window_slice,
-            method=cov_estimator,
-            shrink_delta=shrink_delta,
-        )
+        cov = None
+        if strategy in {"mv_lo", "ecb", "ecb_equala"}:
+            cov = estimate_covariance(
+                window_slice,
+                method=cov_estimator,
+                shrink_delta=shrink_delta,
+            )
+
+        benchmark_weights = None
+        if strategy in {"market_cap", "float_cap"}:
+            if prices is None:
+                raise ValueError("prices are required for strategy='market_cap'")
+            if estimation_end not in prices.index:
+                raise ValueError(f"Price snapshot date {estimation_end} missing from prices index")
+            benchmark_weights = _compute_market_cap_weights(
+                assets=assets,
+                market_cap_meta=market_cap_meta,
+            )
 
         output: StrategyOutput = compute_strategy_weights(
             strategy=strategy,
@@ -117,6 +151,7 @@ def run_backtest(
             k=k,
             gamma=gamma,
             prev_eigenvectors=prev_eigenvectors,
+            benchmark_weights=benchmark_weights,
         )
 
         target_weights = np.clip(output.asset_weights, 0.0, None)

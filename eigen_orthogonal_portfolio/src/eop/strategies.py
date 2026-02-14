@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -33,10 +34,11 @@ def _normalize_simplex(x: np.ndarray) -> np.ndarray:
 def compute_strategy_weights(
     strategy: str,
     returns_window: pd.DataFrame,
-    cov: np.ndarray,
+    cov: np.ndarray | None,
     k: int,
     gamma: float,
     prev_eigenvectors: np.ndarray | None = None,
+    benchmark_weights: np.ndarray | None = None,
 ) -> StrategyOutput:
     strategy = strategy.lower()
     n = returns_window.shape[1]
@@ -54,6 +56,8 @@ def compute_strategy_weights(
         )
 
     if strategy == "mv_lo":
+        if cov is None:
+            raise ValueError("cov is required for strategy 'mv_lo'")
         return StrategyOutput(
             asset_weights=solve_long_only_min_variance(cov),
             component_weights=None,
@@ -65,8 +69,28 @@ def compute_strategy_weights(
             eigen_alignment_mean=None,
         )
 
+    if strategy in {"market_cap", "float_cap"}:
+        if benchmark_weights is None:
+            warnings.warn("No benchmark_weights provided for market_cap; falling back to EW")
+            benchmark_weights = np.ones(n) / n
+        weights = _normalize_simplex(benchmark_weights)
+        return StrategyOutput(
+            asset_weights=weights,
+            component_weights=None,
+            component_blend=None,
+            insample_offdiag_raw=None,
+            insample_offdiag_long_only=None,
+            explained_variance_ratio=None,
+            eigenvectors=None,
+            eigen_alignment_mean=None,
+        )
+
     if strategy not in {"ecb", "ecb_equala"}:
-        raise ValueError("Unknown strategy. Use ew, mv_lo, ecb, or ecb_equala")
+        raise ValueError(
+            "Unknown strategy. Use ew, mv_lo, ecb, ecb_equala, or market_cap"
+        )
+    if cov is None:
+        raise ValueError("cov is required for strategy 'ecb' and 'ecb_equala'")
 
     eig = eigen_decompose(cov, prev_vectors=prev_eigenvectors)
     comp = build_components_with_diagnostics(
